@@ -24,4 +24,18 @@ class DecisionRepository:
             for x in q.all()
         ]
 
+    def list_recent(self, session: Session, symbol: str | None = None, limit: int = 50) -> list[Decision]:
+        """Get recent decisions, optionally filtered by symbol."""
+        q = session.query(Decision).order_by(Decision.ts.desc()).limit(limit)
+        if symbol:
+            q = q.filter(Decision.symbol == symbol)
+        return q.all()
+
+    def list_after_date(self, session: Session, cutoff_date: datetime, symbol: str | None = None) -> list[Decision]:
+        """Get decisions after a specific date."""
+        q = session.query(Decision).filter(Decision.ts >= cutoff_date).order_by(Decision.ts.desc())
+        if symbol:
+            q = q.filter(Decision.symbol == symbol)
+        return q.all()
+
 

@@ -1,0 +1,39 @@
+name: hacking-capital
+description: LLM-free trading agent experiment with FastAPI backend and Streamlit UI
+
+services:
+  api:
+    source: .
+    dockerfile: Dockerfile.api
+    port: 8000
+    environment:
+      - DATABASE_URL=sqlite:///./data/hacking_capital.db
+      - REDIS_URL=redis://redis:6379/0
+      - ALPHAVANTAGE_API_KEY=${ALPHAVANTAGE_API_KEY}
+      - LIQUID_METAL_API_KEY=${LIQUID_METAL_API_KEY}
+    healthcheck:
+      path: /api/v1/health
+      interval: 30s
+      timeout: 10s
+
+  ui:
+    source: .
+    dockerfile: Dockerfile.ui
+    port: 8501
+    environment:
+      - API_BASE=http://api:8000/api/v1
+    depends_on:
+      - api
+
+  redis:
+    image: redis:7-alpine
+    port: 6379
+
+databases:
+  - type: sqlite
+    path: ./data/hacking_capital.db
+
+env_vars:
+  - ALPHAVANTAGE_API_KEY
+  - OPENAI_API_KEY
+  - LIQUID_METAL_API_KEY
