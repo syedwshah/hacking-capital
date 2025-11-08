@@ -1,5 +1,7 @@
+import time
 import streamlit as st
 from ui.api_client import decide
+import pandas as pd
 
 st.title("Paper Trade (Live)")
 
@@ -26,6 +28,26 @@ if st.button("Decide now"):
     except Exception as e:
         st.error(f"Decision error: {e}")
 
-st.caption("This page will later stream simulated trades and show agent contributions over time.")
+st.divider()
+st.subheader("10-minute demo (synthetic)")
+run_demo = st.button("Run 10-step demo")
+placeholder_chart = st.empty()
+placeholder_table = st.empty()
+if run_demo:
+    rows = []
+    for i in range(10):
+        try:
+            result = decide(symbol, "1m", cash)
+            d = result["decision"]
+            rows.append({"step": i + 1, "action": d["action"], "confidence": d["confidence"], "reason": d["reason"]})
+            df = pd.DataFrame(rows)
+            placeholder_table.dataframe(df, use_container_width=True)
+            placeholder_chart.line_chart(df[["confidence"]])
+        except Exception as e:
+            st.error(f"Demo error at step {i+1}: {e}")
+            break
+        time.sleep(0.5)
+
+st.caption("Streaming simulation will replace the loop above in a later iteration.")
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from app.schemas.trade import TradeDecision
 from app.services.data_service import DataService
-from app.services.metrics import simple_moving_average
+from app.services.metrics import simple_moving_average, rsi, macd
 from app.core.cache import KnowledgeCache
 
 
@@ -25,18 +25,38 @@ class TradingService:
         last_slow = slow[-1]
         last_price = closes[-1]
 
+        # RSI and MACD
+        rsi_vals = rsi(closes, 14)
+        last_rsi = rsi_vals[-1]
+        macd_line, signal_line, hist = macd(closes)
+        last_hist = hist[-1] if hist else 0.0
+
+        # Rule blend
+        score = 0.0
+        # SMA crossover
         if last_fast > last_slow * 1.001:
-            action = "BUY"
+            score += 0.5
         elif last_fast < last_slow * 0.999:
+            score -= 0.5
+        # RSI momentum
+        if last_rsi > 55:
+            score += min(0.3, (last_rsi - 55) / 100)
+        elif last_rsi < 45:
+            score -= min(0.3, (45 - last_rsi) / 100)
+        # MACD histogram
+        score += max(-0.2, min(0.2, last_hist / 10.0))
+
+        action = "HOLD"
+        if score > 0.1:
+            action = "BUY"
+        elif score < -0.1:
             action = "SELL"
-        else:
-            action = "HOLD"
 
         qty = 0
         if action == "BUY" and last_price > 0:
             qty = round(cash / last_price, 4)
-        confidence = min(1.0, abs(last_fast - last_slow) / max(1e-6, last_price))  # scaled
-        reason = f"sma10={last_fast:.2f}, sma20={last_slow:.2f}, price={last_price:.2f}"
+        confidence = min(1.0, abs(score))  # scaled 0..1
+        reason = f"sma10={last_fast:.2f}, sma20={last_slow:.2f}, rsi14={last_rsi:.1f}, macd_hist={last_hist:.4f}, score={score:.3f}, price={last_price:.2f}"
         if cache_payload:
             reason = f"{reason}; cache=hit"
         else:
@@ -44,7 +64,7 @@ class TradingService:
 
         decision = TradeDecision(action=action, quantity=qty, confidence=confidence, reason=reason)
         self._explain = [
-            {"agent": "deterministic_sma", "score": 1 if action == "BUY" else (-1 if action == "SELL" else 0), "confidence": confidence, "reason": reason}
+            {"agent": "deterministic_blend", "score": score, "confidence": confidence, "reason": reason}
         ]
         return decision.model_dump()
 

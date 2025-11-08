@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Dict
 
 from app.services.data_service import DataService
+import math
 
 
 class SummaryService:
@@ -33,6 +34,14 @@ class SummaryService:
             highs = [x["high"] for x in items]
             lows = [x["low"] for x in items]
             closes = [x["close"] for x in items]
+            # returns and volatility
+            returns = []
+            for i in range(1, len(closes)):
+                prev = closes[i - 1]
+                cur = closes[i]
+                if prev:
+                    returns.append((cur - prev) / prev)
+            vol = float(math.sqrt(sum(r * r for r in returns) / len(returns))) if returns else 0.0
             stats = {
                 "open": opens[0],
                 "high": max(highs),
@@ -40,6 +49,8 @@ class SummaryService:
                 "close": closes[-1],
                 "mean_close": sum(closes) / len(closes),
                 "count": len(items),
+                "mean_return": sum(returns) / len(returns) if returns else 0.0,
+                "volatility": vol,
             }
             summaries.append({"symbol": symbol, "granularity": granularity, "period": key, "stats": stats})
         return summaries
