@@ -4,6 +4,8 @@ from app.schemas.trade import TradeDecision
 from app.services.data_service import DataService
 from app.services.metrics import simple_moving_average, rsi, macd
 from app.core.cache import KnowledgeCache
+from app.db.base import get_session
+from app.repositories.agent_repo import AgentWeightRepository
 
 
 class TradingService:
@@ -32,19 +34,21 @@ class TradingService:
         last_hist = hist[-1] if hist else 0.0
 
         # Rule blend
+        weights = self._load_weights()
         score = 0.0
         # SMA crossover
-        if last_fast > last_slow * 1.001:
-            score += 0.5
-        elif last_fast < last_slow * 0.999:
-            score -= 0.5
+        sma_score = 0.5 if last_fast > last_slow * 1.001 else (-0.5 if last_fast < last_slow * 0.999 else 0.0)
+        score += sma_score * weights.get("primary", 0.5)
         # RSI momentum
+        rsi_score = 0.0
         if last_rsi > 55:
-            score += min(0.3, (last_rsi - 55) / 100)
+            rsi_score = min(0.3, (last_rsi - 55) / 100)
         elif last_rsi < 45:
-            score -= min(0.3, (45 - last_rsi) / 100)
+            rsi_score = -min(0.3, (45 - last_rsi) / 100)
+        score += rsi_score * weights.get("investor_patterns", 0.25)
         # MACD histogram
-        score += max(-0.2, min(0.2, last_hist / 10.0))
+        macd_score = max(-0.2, min(0.2, last_hist / 10.0))
+        score += macd_score * weights.get("sentiment_tailwinds", 0.25)
 
         action = "HOLD"
         if score > 0.1:
@@ -64,11 +68,23 @@ class TradingService:
 
         decision = TradeDecision(action=action, quantity=qty, confidence=confidence, reason=reason)
         self._explain = [
-            {"agent": "deterministic_blend", "score": score, "confidence": confidence, "reason": reason}
+            {"agent": "primary", "score": sma_score, "weight": weights.get("primary", 0.5), "reason": "SMA crossover"},
+            {"agent": "investor_patterns", "score": rsi_score, "weight": weights.get("investor_patterns", 0.25), "reason": f"RSI {last_rsi:.1f}"},
+            {"agent": "sentiment_tailwinds", "score": macd_score, "weight": weights.get("sentiment_tailwinds", 0.25), "reason": f"MACD hist {last_hist:.4f}"},
         ]
+        self._explain_total = score
         return decision.model_dump()
 
     def explain(self) -> list[dict]:
-        return getattr(self, "_explain", [])
+        data = getattr(self, "_explain", [])
+        total = getattr(self, "_explain_total", 0.0)
+        return {"agents": data, "combined_score": total}
+
+    def _load_weights(self) -> dict[str, float]:
+        with get_session() as session:
+            weights = AgentWeightRepository().get_all(session)
+        if not weights:
+            return {"primary": 0.5, "investor_patterns": 0.25, "sentiment_tailwinds": 0.25}
+        return {item["agent"]: float(item["weight"]) for item in weights}
 
 

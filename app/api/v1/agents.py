@@ -17,8 +17,13 @@ def get_weights(session: Session = Depends(db_session)) -> dict:
 @router.post("/agents/weights")
 def set_weights(payload: dict, session: Session = Depends(db_session)) -> dict:
     items = payload.get("weights", [])
-    AgentWeightRepository().upsert_many(session, items)
-    return {"ok": True, "weights": items}
+    normalized = []
+    total = sum(max(0.0, float(item.get("weight", 0.0))) for item in items) or 1.0
+    for item in items:
+        weight = max(0.0, float(item.get("weight", 0.0))) / total
+        normalized.append({"agent": item["agent"], "weight": weight, "version": item.get("version", "v1")})
+    AgentWeightRepository().upsert_many(session, normalized)
+    return {"ok": True, "weights": normalized}
 
 
 @router.get("/agents/summaries")
