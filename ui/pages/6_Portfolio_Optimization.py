@@ -125,7 +125,7 @@ if st.sidebar.button("Optimize Portfolio", type="primary"):
         st.session_state.optimization_type = optimization_type
 
     st.success("Portfolio optimization complete!")
-    st.experimental_rerun()
+    st.rerun()
 
 # Display results if available
 if "portfolio_data" in st.session_state and "optimization_result" in st.session_state:
@@ -290,6 +290,6 @@ else:
         st.session_state.portfolio_data = mock_create_portfolio("Demo Portfolio", ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"])
         st.session_state.optimization_result = mock_optimize_portfolio("Demo Portfolio", "mpt")
         st.session_state.optimization_type = "Mean-Variance (MPT)"
-        st.experimental_rerun()
+        st.rerun()
 
 st.caption("💡 Pro tip: Use technical indicators to time your rebalancing for optimal entry/exit points!")
