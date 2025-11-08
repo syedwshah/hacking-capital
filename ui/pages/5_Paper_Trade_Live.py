@@ -6,7 +6,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ui.api_client import decide, get_agent_weights, set_agent_weights, simulate_batch, stream_events
 
-st.title("Paper Trade (Live)")
+st.title("🤖 LLM-Powered Paper Trading Demo")
+st.markdown("**AI-driven trading decisions using GPT analysis & OpenAI web crawling**")
 
 if "primary_weight" not in st.session_state:
     st.session_state["primary_weight"] = 0.5
@@ -17,66 +18,36 @@ if "tailwinds_weight" not in st.session_state:
 if "trading_active" not in st.session_state:
     st.session_state["trading_active"] = True
 
-symbol = st.text_input("Symbol", value="AAPL")
-col1, col2, col3 = st.columns(3)
+# Simple symbol and cash selection
+col1, col2 = st.columns(2)
 with col1:
-    st.session_state["primary_weight"] = st.slider(
-        "Primary agent weight", 0.0, 1.0, st.session_state["primary_weight"], 0.05, key="primary_weight_slider"
-    )
+    symbol = st.selectbox("Stock Symbol", ["AAPL", "TSLA", "GOOGL", "MSFT", "NVDA"], index=0)
 with col2:
-    st.session_state["investor_weight"] = st.slider(
-        "Investor patterns weight", 0.0, 1.0, st.session_state["investor_weight"], 0.05, key="investor_weight_slider"
-    )
-with col3:
-    st.session_state["tailwinds_weight"] = st.slider(
-        "Sentiment/tailwinds weight", 0.0, 1.0, st.session_state["tailwinds_weight"], 0.05, key="tailwinds_weight_slider"
-    )
+    cash = st.number_input("Starting Cash ($)", value=1000, min_value=100, step=100)
 
-st.write("Deterministic-only fallback:", st.toggle("Enable", value=False, key="det_only"))
+st.markdown("---")
 
-cash = st.number_input("Cash (USD)", value=1000.0, step=100.0)
-granularity = st.selectbox("Granularity", ["1m", "daily"], index=0)
-
-col_load, col_save = st.columns(2)
-with col_load:
-    if st.button("Load weights", use_container_width=True):
-        data = get_agent_weights()
-        weights = {item["agent"]: item["weight"] for item in data.get("weights", [])}
-        st.session_state["primary_weight"] = weights.get("primary", 0.5)
-        st.session_state["investor_weight"] = weights.get("investor_patterns", 0.25)
-        st.session_state["tailwinds_weight"] = weights.get("sentiment_tailwinds", 0.25)
-        st.success("Loaded weights from API")
-        st.experimental_rerun()
-with col_save:
-    if st.button("Save weights", use_container_width=True):
-        payload = [
-            {"agent": "primary", "weight": st.session_state["primary_weight"]},
-            {"agent": "investor_patterns", "weight": st.session_state["investor_weight"]},
-            {"agent": "sentiment_tailwinds", "weight": st.session_state["tailwinds_weight"]},
-        ]
-        set_agent_weights(payload)
-        st.success("Weights saved (normalized server-side)")
-
-if st.button("Decide now"):
+# Quick single decision test
+st.subheader("🎯 Quick Decision Test")
+if st.button("🤖 Get AI Trading Decision", type="primary"):
     try:
-        result = decide(symbol, granularity, cash)
+        result = decide(symbol, "daily", cash)
         decision = result["decision"]
 
-        # Add cache status badge
-        cache_hit = decision.get("cache_hit", False)
-        cache_badge = "🟢 CACHE HIT" if cache_hit else "🔴 CACHE MISS"
+        # Display decision prominently
+        action_emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡"}.get(decision['action'], "⚪")
+        st.success(f"{action_emoji} **{decision['action']}** - Confidence: {decision['confidence']:.1%}")
+        st.info(f"**AI Reasoning:** {decision['reason']}")
 
-        st.success(f"{decision['action']} - Confidence: {decision['confidence']:.2f} - {cache_badge}")
-        st.write(f"Reason: {decision['reason']}")
-
-        with st.expander("Per-agent contributions"):
+        with st.expander("🤖 Agent Details"):
             st.json(result.get("explain", {}))
+
     except Exception as e:
         st.error(f"Decision error: {e}")
 
-st.divider()
+# Live Trading Simulation
+st.subheader("📈 Live Trading Simulation")
 
-# Trading Mode Selection
 trading_mode = st.radio(
     "🎯 Trading Mode",
     ["Fixed Steps", "Continuous Trading"],
@@ -86,14 +57,11 @@ trading_mode = st.radio(
 )
 
 if trading_mode == "Fixed Steps":
-    st.subheader("Live streaming simulation")
-    steps = st.number_input("Steps to simulate", min_value=1, max_value=60, value=10, step=1, key="stream_steps")
-    run_stream = st.button("🚀 Start Fixed Simulation")
+    steps = st.slider("Number of trades", min_value=5, max_value=30, value=10, key="stream_steps")
+    run_stream = st.button("🚀 Start Fixed Simulation", type="primary")
 else:
-    st.subheader("🎲 Continuous Live Trading")
-    st.info("⚠️ **Continuous Mode**: Trading will run indefinitely until stopped. Perfect for demo!")
-    max_trades = st.number_input("Max trades (0 = unlimited)", min_value=0, max_value=1000, value=50, step=10, key="max_trades")
-    trade_interval = st.slider("Trade interval (seconds)", min_value=1, max_value=10, value=2, key="trade_interval")
+    max_trades = st.slider("Max trades (0 = unlimited)", min_value=10, max_value=100, value=30, key="max_trades")
+    trade_interval = st.slider("Trade interval (seconds)", min_value=1, max_value=5, value=2, key="trade_interval")
     run_stream = st.button("🚀 Start Continuous Trading", type="primary")
 
 if run_stream:

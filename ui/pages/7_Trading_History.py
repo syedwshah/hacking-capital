@@ -58,17 +58,19 @@ def get_simulation_history(limit=10):
         st.error(f"Failed to fetch simulation history: {e}")
         return {"simulation_batches": [], "total_batches": 0}
 
-st.title("📊 Trading History & Simulation")
-st.write("View previous trading decisions and run live simulations.")
+st.title("📊 Trading History & Performance")
+st.markdown("**View past AI trading decisions and performance metrics**")
+# Quick simulation controls
+st.subheader("🚀 Quick Simulation")
+col1, col2, col3 = st.columns(3)
+with col1:
+    symbol = st.selectbox("Stock Symbol", ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"], index=0)
+with col2:
+    duration = st.slider("Duration (minutes)", 5, 15, 5, 5)
+with col3:
+    cash = st.number_input("Starting Cash ($)", value=5000, step=1000)
 
-# Sidebar controls
-st.sidebar.header("Simulation Controls")
-
-symbol = st.sidebar.selectbox("Symbol", ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"], index=0)
-duration = st.sidebar.slider("Duration (minutes)", 5, 30, 10, 5)
-cash = st.sidebar.number_input("Starting Cash ($)", value=10000, step=1000)
-
-if st.sidebar.button("🚀 Start 10-Minute Simulation", type="primary"):
+if st.button("🚀 Start Simulation", type="primary"):
     st.header(f"🎯 Live Simulation: {symbol} - {duration} Minutes")
 
     # Create placeholders for real-time updates
@@ -480,6 +482,52 @@ if st.button("🚀 Run Live Batch Simulation", type="primary", use_container_wid
             status_text.markdown('<p class="status-error">❌ Batch simulation failed</p>', unsafe_allow_html=True)
             progress_bar.empty()
             st.error(f"Error: {str(e)}")
+
+# Trading History Section
+st.markdown("---")
+st.subheader("📈 Recent Trading Decisions")
+
+try:
+    history_data = get_trading_history(limit=20)
+    history = history_data.get("history", [])
+
+    if history:
+        # Convert to DataFrame for display
+        df = pd.DataFrame([
+            {
+                "Time": datetime.fromisoformat(h["ts"]).strftime("%H:%M:%S"),
+                "Symbol": h["symbol"],
+                "Action": h["action"],
+                "Quantity": h["quantity"],
+                "Confidence": f"{h['confidence']:.1%}",
+                "Reason": h["reason"][:50] + "..." if len(h["reason"]) > 50 else h["reason"]
+            }
+            for h in history
+        ])
+
+        st.dataframe(df, use_container_width=True)
+
+        # Simple stats
+        total_decisions = len(history)
+        buy_count = sum(1 for h in history if h["action"] == "BUY")
+        sell_count = sum(1 for h in history if h["action"] == "SELL")
+        avg_confidence = sum(h["confidence"] for h in history) / total_decisions if total_decisions > 0 else 0
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Decisions", total_decisions)
+        with col2:
+            st.metric("Buy Orders", buy_count)
+        with col3:
+            st.metric("Sell Orders", sell_count)
+        with col4:
+            st.metric("Avg Confidence", f"{avg_confidence:.1%}")
+
+    else:
+        st.info("No trading history available. Run some simulations to see results here!")
+
+except Exception as e:
+    st.error(f"Failed to load trading history: {e}")
 
 # Footer
 st.markdown("---")
