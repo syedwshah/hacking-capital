@@ -130,7 +130,7 @@ if st.button("🚀 Start Simulation", type="primary"):
             # Update price chart
             if price_history:
                 price_df = pd.DataFrame(price_history)
-                chart_placeholder.line_chart(price_df.set_index("step")["price"])
+                chart_placeholder.line_chart(price_df.set_index("step")["price"], key=f"price_chart_{event_count}")
 
             # Update trades table
             if trades_data:
@@ -311,7 +311,7 @@ try:
                         height=200,
                         margin=dict(l=0, r=0, t=30, b=0)
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, use_container_width=True, key=f"action_dist_{batch_name}_{i}")
 
                 # Show sample decisions
                 if batch["decisions"]:
@@ -471,7 +471,7 @@ if st.button("🚀 Run Live Batch Simulation", type="primary", use_container_wid
                     # Simple confidence chart
                     if len(symbol_result["actions"]) > 1:
                         st.write("**Confidence Trend:**")
-                        st.line_chart([symbol_result["avg_confidence"]] * len(symbol_result["actions"]))
+                        st.line_chart([symbol_result["avg_confidence"]] * len(symbol_result["actions"]), key=f"confidence_{symbol_result['symbol']}_{i}_{batch_name}")
 
             # Auto-refresh simulation history after completion
             st.success("✅ Results added to simulation history!")
@@ -495,7 +495,7 @@ try:
         # Convert to DataFrame for display
         df = pd.DataFrame([
             {
-                "Time": datetime.fromisoformat(h["ts"]).strftime("%H:%M:%S"),
+                "Time": datetime.fromisoformat(h["timestamp"]).strftime("%H:%M:%S"),
                 "Symbol": h["symbol"],
                 "Action": h["action"],
                 "Quantity": h["quantity"],

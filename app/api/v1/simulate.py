@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 import json
 import time
+from datetime import datetime
 from typing import List
 from app.api.deps import db_session
 from app.services.trading_service import TradingService
@@ -72,7 +73,31 @@ def simulate_batch(payload: dict, session: Session = Depends(db_session)) -> dic
     trade_repo = TradeRepository()
 
     for symbol in symbols:
-        prices = DataService().fetch(symbol, "2020-01-01", "2020-01-31", "1m")
+        # Generate consistent synthetic data for batch simulation (same as live trading)
+        import random
+        base_price = 150.0
+
+        # Create trending data with consistent seed for reproducibility
+        random.seed(hash(symbol) % 10000)  # Consistent seed per symbol
+        trend_type = random.choice(["up", "down", "sideways"])
+        trend_strength = random.uniform(2, 8) if trend_type != "sideways" else 0
+
+        prices = []
+        for i in range(max(steps, 5)):  # Ensure at least 5 points for trend analysis
+            if trend_type == "up":
+                price_change = trend_strength * (i / 4) + random.uniform(-1, 3)
+            elif trend_type == "down":
+                price_change = -trend_strength * (i / 4) + random.uniform(-3, 1)
+            else:
+                price_change = random.uniform(-2, 2)
+
+            close_price = base_price + price_change
+            prices.append({
+                "close": round(close_price, 2),
+                "ts": f"2024-01-01T10:{i:02d}:00",
+                "symbol": symbol
+            })
+
         prices = prices[-steps:] if len(prices) >= steps else prices
         decisions = []
         explain_totals = []
@@ -107,6 +132,15 @@ def simulate_batch(payload: dict, session: Session = Depends(db_session)) -> dic
         cache_hit = cache.get_summary(symbol, "1m") is not None
         actions = [d["action"] for d in decisions]
 
+        # Store synthetic market data for reuse
+        synthetic_data_key = f"synthetic_data_{symbol}_1m"
+        cache.set_summary(symbol, "1m", {
+            "synthetic_data": prices,
+            "trend_type": trend_type,
+            "trend_strength": trend_strength,
+            "generated_at": datetime.now().isoformat()
+        }, ttl_s=3600)  # Cache for 1 hour
+
         results.append(
             {
                 "symbol": symbol,
@@ -115,6 +149,11 @@ def simulate_batch(payload: dict, session: Session = Depends(db_session)) -> dic
                 "avg_confidence": sum(d["confidence"] for d in decisions) / len(decisions) if decisions else 0.0,
                 "avg_score": sum(explain_totals) / len(explain_totals) if explain_totals else 0.0,
                 "cache_hit": cache_hit,
+                "synthetic_data": prices,  # Include synthetic data in response
+                "trend_info": {
+                    "type": trend_type,
+                    "strength": trend_strength
+                }
             }
         )
 

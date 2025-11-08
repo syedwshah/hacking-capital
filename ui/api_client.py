@@ -67,3 +67,72 @@ def stream_events(symbol: str, steps: int, cash: float):
                         yield json.loads(payload)
 
 
+def get_portfolio_state() -> dict:
+    with httpx.Client(timeout=5.0) as client:
+        r = client.get(f"{API_BASE}/portfolio/state")
+        r.raise_for_status()
+        return r.json()
+
+
+def optimize_mean_variance(symbols: list[str], returns: list[float], covariance: list[list[float]], risk_free_rate: float = 0.02) -> dict:
+    with httpx.Client(timeout=10.0) as client:
+        r = client.post(f"{API_BASE}/portfolio/optimize/mean-variance", json={
+            "symbols": symbols,
+            "returns": returns,
+            "covariance": covariance,
+            "risk_free_rate": risk_free_rate
+        })
+        r.raise_for_status()
+        return r.json()
+
+
+def optimize_risk_parity(symbols: list[str], covariance: list[list[float]]) -> dict:
+    with httpx.Client(timeout=10.0) as client:
+        r = client.post(f"{API_BASE}/portfolio/optimize/risk-parity", json={
+            "symbols": symbols,
+            "covariance": covariance
+        })
+        r.raise_for_status()
+        return r.json()
+
+
+def get_trading_history(limit: int = 50, symbol: str = None) -> dict:
+    params = {"limit": limit}
+    if symbol:
+        params["symbol"] = symbol
+    with httpx.Client(timeout=5.0) as client:
+        r = client.get(f"{API_BASE}/trade/history", params=params)
+        r.raise_for_status()
+        return r.json()
+
+
+def get_trading_performance(start_date: str = None, end_date: str = None) -> dict:
+    params = {}
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    with httpx.Client(timeout=5.0) as client:
+        r = client.get(f"{API_BASE}/trade/performance", params=params)
+        r.raise_for_status()
+        return r.json()
+
+
+def get_simulation_history(limit: int = 10) -> dict:
+    with httpx.Client(timeout=5.0) as client:
+        r = client.get(f"{API_BASE}/simulate/history", params={"limit": limit})
+        r.raise_for_status()
+        return r.json()
+
+
+def generate_summaries(symbol: str, granularity: str = "daily", period_days: int = 30) -> dict:
+    with httpx.Client(timeout=30.0) as client:
+        r = client.post(f"{API_BASE}/summaries/generate", json={
+            "symbol": symbol,
+            "granularity": granularity,
+            "period_days": period_days
+        })
+        r.raise_for_status()
+        return r.json()
+
+

@@ -105,11 +105,11 @@ if completed_jobs:
                     st.metric("Max Drawdown", f"{result.get('max_drawdown', 0):.1%}")
 
                 # Performance summary
-                st.success(result.get("summary", ""))
+        st.success(result.get("summary", ""))
 
                 # Equity curve with buy-and-hold comparison
-                snapshots = result.get("snapshots", [])
-                if snapshots:
+        snapshots = result.get("snapshots", [])
+        if snapshots:
                     st.subheader("📈 Performance Comparison")
 
                     # Fetch price data for buy-and-hold calculation
@@ -140,9 +140,9 @@ if completed_jobs:
                             st.line_chart(df[["equity"]], use_container_width=True)
                     except Exception:
                         # Fallback if price fetch fails
-                        df = pd.DataFrame(snapshots)
-                        df["ts"] = pd.to_datetime(df["ts"])
-                        df = df.set_index("ts")
+            df = pd.DataFrame(snapshots)
+            df["ts"] = pd.to_datetime(df["ts"])
+            df = df.set_index("ts")
                         st.line_chart(df[["equity"]], use_container_width=True)
 
                 # Buy-and-hold comparison
@@ -227,7 +227,7 @@ if completed_jobs:
                         except Exception as e:
                             st.warning(f"Could not analyze decisions for {analysis_date.strftime('%Y-%m-%d')}: {e}")
 
-                except Exception as e:
+    except Exception as e:
                     st.warning(f"Decision analysis unavailable: {e}")
 
             elif job["status"] == "failed":

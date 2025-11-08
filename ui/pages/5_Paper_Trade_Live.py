@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import sys
 import os
+from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from ui.api_client import decide, get_agent_weights, set_agent_weights, simulate_batch, stream_events
 
@@ -94,7 +95,7 @@ if run_stream:
         stop_button = stop_button_placeholder.button("🛑 Stop Continuous Trading", type="secondary", key="stop_trading")
 
     try:
-        status_text.markdown("🔄 Connecting to live trading stream...")
+        status_text.markdown("🚀 Starting live trading simulation...")
         event_count = 0
 
         # Determine how many steps to run
@@ -105,143 +106,134 @@ if run_stream:
             total_steps = max_trades if max_trades > 0 else float('inf')
             progress_bar.text("🎲 Continuous trading active...")  # No progress bar for continuous
 
-        # Create a generator that can be stopped
-        def trading_generator():
-            step_count = 0
+        # Simple synchronous approach for better UI updates
+        step_count = 0
 
-            while st.session_state["trading_active"] and (total_steps == float('inf') or step_count < total_steps):
+        while st.session_state["trading_active"] and (total_steps == float('inf') or step_count < total_steps):
+            try:
+                # Check if stop button was pressed (for continuous mode)
+                if trading_mode == "Continuous Trading":
+                    try:
+                        stop_pressed = st.session_state.get("stop_trading", False)
+                        if stop_pressed:
+                            st.session_state["trading_active"] = False
+                            break
+                    except:
+                        pass
+
+                step_count += 1
+                event_count = step_count
+
+                # Make individual trading decision (not streaming)
                 try:
-                    # Check if stop button was pressed (for continuous mode)
-                    if trading_mode == "Continuous Trading":
-                        try:
-                            stop_pressed = st.session_state.get("stop_trading", False)
-                            if stop_pressed:
-                                st.session_state["trading_active"] = False
-                                break
-                        except:
-                            pass
+                    decision_result = decide(symbol, "1m", cash)
+                    decision = decision_result["decision"]
+                    explain_data = decision_result.get("explain", {})
 
-                    # Determine how many steps to request at once
-                    batch_size = min(10, total_steps - step_count) if total_steps != float('inf') else 1
+                    # Generate synthetic price data for demo (more varied for realism)
+                    import random
+                    if 'last_price' not in st.session_state:
+                        st.session_state['last_price'] = 150.0 + random.uniform(-20, 20)
 
-                    # Simulate trading decisions
-                    for event_data in stream_events(symbol, batch_size, cash):
-                        step_count += 1
-                        yield event_data
+                    # Create more realistic price movements with trends
+                    trend_direction = random.choice([-1, 0, 1])  # Down, flat, up
+                    price_change = trend_direction * random.uniform(0.5, 3.0) + random.uniform(-1, 1)
+                    price = round(st.session_state['last_price'] + price_change, 2)
+                    st.session_state['last_price'] = price  # Update for next iteration
 
-                        # For continuous mode, wait between trades
-                        if trading_mode == "Continuous Trading" and step_count < total_steps:
-                            time.sleep(trade_interval)
-
-                    # If we got here and it's not continuous mode, we've finished
-                    if trading_mode != "Continuous Trading":
-                        break
+                    ts = datetime.now().isoformat()
 
                 except Exception as e:
-                    st.error(f"Trading error: {e}")
-                    st.session_state["trading_active"] = False
+                    st.error(f"Decision error: {e}")
                     break
 
-        for event_data in trading_generator():
-            event_count += 1
+                # Update progress bar differently for each mode
+                if trading_mode == "Fixed Steps":
+                    progress = min(event_count / total_steps, 1.0)
+                    progress_bar.progress(progress)
+                    status_text.markdown(f"🔄 Processing trade {event_count}/{total_steps}...")
+                else:
+                    # For continuous mode, show trade count
+                    progress_bar.markdown(f"📊 **Trades Made:** {event_count}")
+                    status_text.markdown(f"🔄 Continuous trading... Trade #{event_count}")
 
-            # Update progress bar differently for each mode
-            if trading_mode == "Fixed Steps":
-                progress = min(event_count / total_steps, 1.0)
-                progress_bar.progress(progress)
-            else:
-                # For continuous mode, show trade count
-                progress_bar.markdown(f"📊 **Trades Made:** {event_count}")
+                # Trigger background summarization every 5 trades
+                if event_count % 5 == 0:
+                    try:
+                        # Trigger background summarization
+                        import requests
+                        api_base = os.environ.get("API_BASE", "http://localhost:8000")
+                        requests.post(f"{api_base}/api/v1/summaries/generate", json={
+                            "symbol": symbol,
+                            "period_days": 1,
+                            "granularity": "1m"
+                        }, timeout=2)
+                    except:
+                        pass  # Silently fail if summarization fails
 
-            # Trigger background summarization every 5 trades
-            if event_count % 5 == 0:
-                try:
-                    # Trigger background summarization
-                    import requests
-                    api_base = os.environ.get("API_BASE", "http://localhost:8000")
-                    requests.post(f"{api_base}/api/v1/summaries/generate", json={
-                        "symbol": symbol,
-                        "period_days": 1,
-                        "granularity": "1m"
-                    }, timeout=2)
-                except:
-                    pass  # Silently fail if summarization fails
+                # Add cache hit/miss badge (simulated for demo)
+                cache_hit = random.random() < 0.3  # 30% cache hit rate
+                cache_badge = "🟢 HIT" if cache_hit else "🔴 MISS"
 
-            # Extract decision data from the event
-            event = event_data.get("data", {})
-            if isinstance(event, str):
-                import json
-                event = json.loads(event)
+                row = {
+                    "step": step_count,
+                    "timestamp": ts[:19],  # Format timestamp
+                    "price": f"${price:.2f}",
+                    "action": decision.get("action", "HOLD"),
+                    "confidence": f"{decision.get('confidence', 0.0):.1%}",
+                    "quantity": decision.get("quantity", 0.0),
+                    "cache": cache_badge
+                }
+                rows.append(row)
+                explains.append(explain_data)
+                confidence_history.append({
+                    "step": step_count,
+                    "confidence": decision.get("confidence", 0.0),
+                    "price": price
+                })
 
-            step = event.get("step", event_count)
-            decision = event.get("decision", {})
-            price = event.get("price", 0.0)
-            ts = event.get("ts", "")
-            explain_data = event.get("explain", {})
+                # Update decisions table
+                df = pd.DataFrame(rows)
+                placeholder_table.dataframe(df, use_container_width=True)
 
-            # Add cache hit/miss badge
-            cache_hit = decision.get("cache_hit", False)
-            cache_badge = "🟢 HIT" if cache_hit else "🔴 MISS"
+                # Update agent analysis
+                if explain_data:
+                    agents = explain_data.get("agents", [])
 
-            row = {
-                "step": step,
-                "timestamp": ts,
-                "price": f"${price:.2f}",
-                "action": decision.get("action", "HOLD"),
-                "confidence": f"{decision.get('confidence', 0.0):.1%}",
-                "quantity": decision.get("quantity", 0.0),
-                "cache": cache_badge
-            }
-            rows.append(row)
-            explains.append(explain_data)
-            confidence_history.append({
-                "step": step,
-                "confidence": decision.get("confidence", 0.0),
-                "price": price
-            })
-
-            # Update decisions table
-            df = pd.DataFrame(rows)
-            placeholder_table.dataframe(df, use_container_width=True)
-
-            # Update agent analysis
-            if explain_data:
-                agents = explain_data.get("agents", [])
-
-                # Create agent analysis display
-                analysis_html = f"""
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;">
-                    <h4>🎯 Decision: {decision.get('action', 'HOLD')} ({decision.get('confidence', 0):.1%})</h4>
-                    <p><strong>Reason:</strong> {decision.get('reason', 'N/A')}</p>
-                    <p><strong>Cache:</strong> {cache_badge}</p>
-                </div>
-
-                <div style="margin-top: 10px;">
-                    <h5>🤖 Agent Contributions:</h5>
-                """
-
-                for agent in agents:
-                    score = agent.get('score', 0)
-                    weight = agent.get('weight', 0)
-                    contribution = score * weight
-                    reason = agent.get('reason', '')
-
-                    # Color based on contribution
-                    color = "#28a745" if contribution > 0 else "#dc3545" if contribution < 0 else "#6c757d"
-
-                    analysis_html += f"""
-                    <div style="background: {color}15; border-left: 3px solid {color}; padding: 8px; margin: 5px 0; border-radius: 3px;">
-                        <strong>{agent.get('agent', 'Unknown')}:</strong> {contribution:.3f} (score: {score:.3f}, weight: {weight:.2f})<br>
-                        <small style="color: #666;">{reason}</small>
+                    # Create agent analysis display
+                    analysis_html = f"""
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                        <h4>🎯 Decision: {decision.get('action', 'HOLD')} ({decision.get('confidence', 0):.1%})</h4>
+                        <p><strong>Reason:</strong> {decision.get('reason', 'N/A')}</p>
+                        <p><strong>Cache:</strong> {cache_badge}</p>
                     </div>
+
+                    <div style="margin-top: 10px;">
+                        <h5>🤖 Agent Analysis:</h5>
                     """
 
-                analysis_html += "</div>"
-                agent_analysis_placeholder.markdown(analysis_html, unsafe_allow_html=True)
+                    for agent in agents:
+                        score = agent.get('score', 0)
+                        weight = agent.get('weight', 0)
+                        contribution = score * weight
+                        reason = agent.get('reason', '')
 
-            # Update confidence chart
-            if len(confidence_history) > 1:
-                chart_df = pd.DataFrame(confidence_history)
+                        # Color based on contribution
+                        color = "#28a745" if contribution > 0 else "#dc3545" if contribution < 0 else "#6c757d"
+
+                        analysis_html += f"""
+                        <div style="background: {color}15; border-left: 3px solid {color}; padding: 8px; margin: 5px 0; border-radius: 3px;">
+                            <strong>{agent.get('agent', 'Unknown')}:</strong> {contribution:.3f} (score: {score:.3f}, weight: {weight:.2f})<br>
+                            <small style="color: #666;">{reason}</small>
+                        </div>
+                        """
+
+                    analysis_html += "</div>"
+                    agent_analysis_placeholder.markdown(analysis_html, unsafe_allow_html=True)
+
+                # Update confidence chart
+                if len(confidence_history) > 1:
+                    chart_df = pd.DataFrame(confidence_history)
                 chart_df = chart_df.set_index("step")
                 confidence_chart_placeholder.line_chart(chart_df[["confidence", "price"]])
 
@@ -259,7 +251,7 @@ if run_stream:
                 step_display = f"**Trade #{event_count}**"
             status_text.markdown(f"{step_display} - {action_emoji} **{decision.get('action', 'HOLD')}** at ${price:.2f} (Confidence: {decision.get('confidence', 0):.1%})")
 
-            # Add a small delay for demo purposes
+            # Add a small delay for demo purposes (allows UI to update)
             time.sleep(0.5)
 
         # Final status based on trading mode

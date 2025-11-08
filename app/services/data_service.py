@@ -12,9 +12,15 @@ from datetime import datetime, timedelta
 class DataService:
     def fetch(self, symbol: str, start_date: str, end_date: str, interval: str) -> list[dict]:
         """
-        Fetch market data using OpenAI-powered web crawling.
-        Skips Alpha Vantage entirely due to rate limiting.
+        Fetch market data. Uses synthetic data for fast demo operations,
+        OpenAI-powered web crawling as fallback for real analysis.
         """
+        # Use fast synthetic data for demo/live trading (minute intervals)
+        if interval in {"1m", "minute"}:
+            print("⚡ Using fast synthetic data for live trading demo...")
+            return self._generate_synthetic_data(symbol, start_date, end_date, interval)
+
+        # Use OpenAI for daily data analysis
         print("🔍 Using OpenAI-powered web crawling for stock data...")
         return self._crawl_web_for_stock_data(symbol, start_date, end_date, interval)
 
@@ -96,6 +102,7 @@ class DataService:
         """
         Enhanced synthetic data with realistic market patterns.
         Includes more realistic volatility, gaps, and volume patterns.
+        For demo/live trading, limit minute data to reasonable amounts.
         """
         start = _parse_dt(start_date)
         end = _parse_dt(end_date)
@@ -103,6 +110,16 @@ class DataService:
             return []
 
         step = dt.timedelta(minutes=1) if interval in {"1m", "minute"} else dt.timedelta(days=1)
+
+        # For demo/live trading, limit minute data to 100 points max for performance
+        if interval in {"1m", "minute"}:
+            max_points = 100
+            total_possible = int((end - start) / step) + 1
+            if total_possible > max_points:
+                # Sample evenly across the range
+                step = dt.timedelta(seconds=int((end - start).total_seconds() / (max_points - 1)))
+                end = start + step * (max_points - 1)
+
         t = start
         rows: List[Dict] = []
 

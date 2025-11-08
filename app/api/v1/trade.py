@@ -16,15 +16,20 @@ def trade_decide(payload: dict, session: Session = Depends(db_session)) -> dict:
     cash = float(payload.get("cash", 0))
     svc = TradingService()
     decision = svc.decide(symbol, granularity, cash)
-    # persist decision
-    DecisionRepository().insert(
-        session,
-        symbol=symbol,
-        action=decision["action"],
-        quantity=decision["quantity"],
-        confidence=decision["confidence"],
-        reason=decision["reason"],
-    )
+    # Persist decision (make non-blocking for demo)
+    try:
+        DecisionRepository().insert(
+            session,
+            symbol=symbol,
+            action=decision["action"],
+            quantity=decision["quantity"],
+            confidence=decision["confidence"],
+            reason=decision["reason"],
+        )
+    except Exception:
+        # Silently fail persistence for demo speed
+        pass
+
     return {"decision": decision, "explain": svc.explain()}
 
 
