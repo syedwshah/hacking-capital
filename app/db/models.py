@@ -84,6 +84,6 @@ class Vector(Base):
     __tablename__ = "vectors"
     key: Mapped[str] = mapped_column(String, primary_key=True)
     vector: Mapped[list] = mapped_column(JSON)
-    metadata: Mapped[dict] = mapped_column(JSON)
+    meta_json: Mapped[dict] = mapped_column(JSON)
 
 

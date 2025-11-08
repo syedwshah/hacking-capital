@@ -41,6 +41,28 @@ pip install -e .
 uvicorn app.main:app --reload
 streamlit run ui/App.py
 
+Docker / Compose
+Build and run API + UI + Redis locally:
+
+docker compose up --build
+
+API: http://localhost:8000/api/v1/health
+UI:  http://localhost:8501
+
+PaaS (Raindrop) readiness
+- This repo includes Dockerfiles for API and UI plus a Compose file. Push images to your container registry of choice (e.g., GHCR) and point Raindrop or any PaaS to these images.
+- Example (GHCR):
+
+docker build -t ghcr.io/<org>/hacking-capital-api:latest -f Dockerfile.api .
+docker build -t ghcr.io/<org>/hacking-capital-ui:latest -f Dockerfile.ui .
+docker push ghcr.io/<org>/hacking-capital-api:latest
+docker push ghcr.io/<org>/hacking-capital-ui:latest
+
+Then configure service environment:
+- DATABASE_URL
+- REDIS_URL
+- API_BASE (for UI)
+
 Makefile shortcuts
 make run-api
 make run-ui
