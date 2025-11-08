@@ -11,6 +11,10 @@ class BackgroundJobManager:
     """Manages background jobs with persistent state across page navigation."""
 
     def __init__(self):
+        # Initialize session state if it doesn't exist
+        if not hasattr(st, 'session_state'):
+            return
+
         if "job_manager" not in st.session_state:
             st.session_state["job_manager"] = {
                 "jobs": {},  # job_id -> job_data
@@ -19,14 +23,25 @@ class BackgroundJobManager:
 
     def get_jobs(self) -> Dict[str, Dict[str, Any]]:
         """Get all jobs (completed and active)."""
+        self._ensure_initialized()
         return st.session_state["job_manager"]["jobs"]
 
     def get_active_jobs(self) -> set:
         """Get currently running job IDs."""
+        self._ensure_initialized()
         return st.session_state["job_manager"]["active_jobs"]
+
+    def _ensure_initialized(self):
+        """Ensure session state is initialized."""
+        if "job_manager" not in st.session_state:
+            st.session_state["job_manager"] = {
+                "jobs": {},  # job_id -> job_data
+                "active_jobs": set(),  # currently running job IDs
+            }
 
     def start_backtest_job(self, symbol: str, start_date: str, end_date: str, initial_cash: float) -> str:
         """Start a background backtest job."""
+        self._ensure_initialized()
         job_id = str(uuid.uuid4())
 
         # Create job entry
@@ -97,16 +112,19 @@ class BackgroundJobManager:
             job["progress"] = 100
         finally:
             # Remove from active jobs
+            self._ensure_initialized()
             if job_id in st.session_state["job_manager"]["active_jobs"]:
                 st.session_state["job_manager"]["active_jobs"].remove(job_id)
 
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get job status and data."""
+        self._ensure_initialized()
         jobs = st.session_state["job_manager"]["jobs"]
         return jobs.get(job_id)
 
     def cleanup_old_jobs(self, max_age_hours: int = 24):
         """Clean up completed jobs older than max_age_hours."""
+        self._ensure_initialized()
         cutoff_time = datetime.now().timestamp() - (max_age_hours * 3600)
         jobs = st.session_state["job_manager"]["jobs"]
 

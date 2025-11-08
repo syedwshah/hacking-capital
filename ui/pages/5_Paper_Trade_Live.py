@@ -139,7 +139,7 @@ if run_stream:
 
                 except Exception as e:
                     st.error(f"Trading error: {e}")
-                    trading_active = False
+                    st.session_state["trading_active"] = False
                     break
 
         for event_data in trading_generator():
