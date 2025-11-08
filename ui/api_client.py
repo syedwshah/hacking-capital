@@ -11,3 +11,10 @@ def get_health() -> dict:
         return r.json()
 
 
+def decide(symbol: str, granularity: str, cash: float) -> dict:
+    with httpx.Client(timeout=10.0) as client:
+        r = client.post(f"{API_BASE}/trade/decide", json={"symbol": symbol, "granularity": granularity, "cash": cash})
+        r.raise_for_status()
+        return r.json()
+
+
