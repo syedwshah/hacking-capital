@@ -14,6 +14,8 @@ if "investor_weight" not in st.session_state:
     st.session_state["investor_weight"] = 0.25
 if "tailwinds_weight" not in st.session_state:
     st.session_state["tailwinds_weight"] = 0.25
+if "trading_active" not in st.session_state:
+    st.session_state["trading_active"] = True
 
 symbol = st.text_input("Symbol", value="AAPL")
 col1, col2, col3 = st.columns(3)
@@ -117,7 +119,7 @@ if run_stream:
     rows = []
     explains = []
     confidence_history = []
-    trading_active = True
+    st.session_state["trading_active"] = True
 
     # Stop button for continuous mode
     if trading_mode == "Continuous Trading":
@@ -139,14 +141,14 @@ if run_stream:
         def trading_generator():
             step_count = 0
 
-            while trading_active and (total_steps == float('inf') or step_count < total_steps):
+            while st.session_state["trading_active"] and (total_steps == float('inf') or step_count < total_steps):
                 try:
                     # Check if stop button was pressed (for continuous mode)
                     if trading_mode == "Continuous Trading":
                         try:
                             stop_pressed = st.session_state.get("stop_trading", False)
                             if stop_pressed:
-                                trading_active = False
+                                st.session_state["trading_active"] = False
                                 break
                         except:
                             pass
@@ -297,7 +299,7 @@ if run_stream:
             progress_bar.progress(1.0)
             status_text.markdown(f"✅ **Fixed Simulation Complete!** Processed {event_count} trading decisions with live agent analysis.")
         else:
-            if not trading_active:
+            if not st.session_state["trading_active"]:
                 status_text.markdown(f"🛑 **Continuous Trading Stopped!** Processed {event_count} trading decisions total.")
             else:
                 status_text.markdown(f"🎯 **Continuous Trading Finished!** Reached target of {max_trades} trades.")
