@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Environments
+.env
+.venv/
+venv/
+
+# Editors
+.idea/
+.vscode/
+.cursor/
+
+# Data/Artifacts
+*.db
+*.sqlite
+*.sqlite3
+logs/
+tmp/
+
+
