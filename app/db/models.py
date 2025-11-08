@@ -30,6 +30,17 @@ class Summary(Base):
     stats_json: Mapped[dict] = mapped_column(JSON)
 
 
+class AgentSummary(Base):
+    __tablename__ = "agent_summaries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String)
+    agent: Mapped[str] = mapped_column(String)
+    granularity: Mapped[str] = mapped_column(String)
+    ts: Mapped[dt.datetime] = mapped_column(DateTime)
+    reason: Mapped[str] = mapped_column(String)
+    stats_json: Mapped[dict] = mapped_column(JSON)
+
+
 class Decision(Base):
     __tablename__ = "decisions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -67,5 +78,12 @@ class AgentWeight(Base):
     weight: Mapped[float] = mapped_column(Float)
     version: Mapped[str] = mapped_column(String)
     updated_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+
+
+class Vector(Base):
+    __tablename__ = "vectors"
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    vector: Mapped[list] = mapped_column(JSON)
+    metadata: Mapped[dict] = mapped_column(JSON)
 
 
